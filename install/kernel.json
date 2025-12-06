@@ -1,0 +1,10 @@
+{
+    "argv": [
+        "/Users/asaryche/projects/Rust/juker/target/debug/juker",
+        "--connection-file",
+        "{connection_file}"
+    ],
+    "display_name": "test-rust",
+    "language": "nothing",
+    "interrupt_mode": "message"
+}
