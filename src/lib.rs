@@ -9,14 +9,20 @@ pub use con_info::ConnectionInfo;
 
 #[derive(Debug, thiserror::Error)]
 pub enum JuError {
-    #[error("UTF-8 Error: {0}")]
+    #[error(transparent)]
     Utf8Error(#[from] std::str::Utf8Error),
 
-    #[error("Json Error: {0}")]
+    #[error(transparent)]
     JsonError(#[from] serde_json::Error),
 
-    #[error("Zmq Error: {0}")]
+    #[error(transparent)]
     ZmqError(#[from] zeromq::ZmqError),
+
+    #[error(transparent)]
+    TryLockError(#[from] tokio::sync::TryLockError),
+
+    #[error("Unsupported Jupyter Message type: {0}")]
+    UnsupportedMessageType(String),
 
     #[error("Malformed Jupyter Message: {0}")]
     MalformedMessage(String),
@@ -26,6 +32,9 @@ pub enum JuError {
 
     #[error("execute_request has no code: {0}")]
     NoCode(String),
+
+    #[error("Juker encountered an error: {0}")]
+    GeneralJukerError(String),
 }
 
 pub type JuResult<T> = std::result::Result<T, JuError>;

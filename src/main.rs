@@ -1,11 +1,10 @@
+use anyhow::Result;
 use clap::Parser;
-use tracing::{ debug, error, info, level_filters::LevelFilter, trace, warn };
+use juker::{ConnectionInfo, server::JuServer};
+use std::{env, fs::File, path::PathBuf};
+use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_udp::UdpTracingWriter;
-use zeromq::{ Socket, SocketRecv, SocketSend };
-use std::{ env, fs::File, path::PathBuf };
-use anyhow::{ Result, bail };
-use juker::{ ConnectionInfo, JuMessage, server::JuServer };
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -44,16 +43,23 @@ impl JupyterApplication {
         let ci: ConnectionInfo = serde_json::from_reader(f)?;
         info!("Connection file content: {:?}", ci);
 
-        let mut srv = JuServer::new(ci).await?;
-        let res = srv.run().await;
+        loop {
+            let mut srv = JuServer::new(&ci).await?;
+            let res = srv.run().await;
 
-        match &res {
-            Ok(_) => {
-                error!("Server exited successfully");
+            match &res {
+                Ok(true) => {
+                    info!("Server exited and requested restart, restarting.");
+                    continue;
+                }
+                Ok(false) => {
+                    info!("Server exited successfully.");
+                }
+                Err(e) => {
+                    error!("Server error: {:?}", e);
+                }
             }
-            Err(e) => {
-                error!("Server error: {:?}", e);
-            }
+            break;
         }
 
         Ok(())
@@ -62,10 +68,11 @@ impl JupyterApplication {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let subscriber = tracing_subscriber
-        ::fmt()
+    let subscriber = tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::builder().with_default_directive(LevelFilter::DEBUG.into()).from_env_lossy()
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::DEBUG.into())
+                .from_env_lossy(),
         )
         .with_writer(UdpTracingWriter::new("localhost:5555")?)
         // Use a more compact, abbreviated log format

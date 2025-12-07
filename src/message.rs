@@ -1,13 +1,31 @@
 use std::ops::ControlFlow;
 
+use crate::{DELIMITER, JuError, JuResult, digester::Digester};
 use bytes::Bytes;
-use serde_json::{ Value, json };
+use serde_json::{Value, json};
 use zeromq::ZmqMessage;
-use crate::{ DELIMITER, JuError, JuResult, digester::Digester };
+
+pub enum EvalResult {
+    Success { results: Vec<EvalValue> },
+    Error {
+        ename: Value,
+        evalue: Value,
+        traceback: Vec<Value>,
+    },
+}
+
+pub struct EvalValue {
+    pub data: Value,
+    pub metadata: Value,
+}
 
 pub enum MsgSource<T> {
     Shell(T),
     Control(T),
+    Execution {
+        eval_result: EvalResult,
+        original_msg: JuMessage,
+    },
 }
 
 pub struct JuMessage {
@@ -19,32 +37,41 @@ pub struct JuMessage {
 }
 
 impl JuMessage {
-    pub fn create_derived(&self, msg_type: &str) -> Self {
-        let parent_header = self.header.clone();
-        let mut header = self.header.clone();
-        header["msg_type"] = Value::String(msg_type.into());
+    // pub fn create_derived(&self, msg_type: &str) -> Self {
+    //     let parent_header = self.header.clone();
+    //     let mut header = self.header.clone();
+    //     header["msg_type"] = Value::String(msg_type.into());
 
-        Self { zmq_ids: Vec::new(), header, parent_header, metadata: json!({}), content: json!({}) }
-    }
+    //     Self {
+    //         zmq_ids: Vec::new(),
+    //         header,
+    //         parent_header,
+    //         metadata: json!({}),
+    //         content: json!({}),
+    //     }
+    // }
 
-    pub fn create_reply(&self) -> Self {
-        let parent_header = self.header.clone();
-        let mut header = self.header.clone();
+    // pub fn create_reply(&self) -> Self {
+    //     let parent_header = self.header.clone();
+    //     let mut header = self.header.clone();
 
-        header
-            .get_mut("msg_type")
-            .into_iter()
-            .for_each(|v| {
-                if let Value::String(s) = v {
-                    *s = s.replace("_request", "_reply");
-                }
-            });
+    //     header.get_mut("msg_type").into_iter().for_each(|v| {
+    //         if let Value::String(s) = v {
+    //             *s = s.replace("_request", "_reply");
+    //         }
+    //     });
 
-        let mut zmq_ids = Vec::new();
-        zmq_ids.clone_from(&self.zmq_ids);
+    //     let mut zmq_ids = Vec::new();
+    //     zmq_ids.clone_from(&self.zmq_ids);
 
-        Self { zmq_ids, header, parent_header, metadata: json!({}), content: json!({}) }
-    }
+    //     Self {
+    //         zmq_ids,
+    //         header,
+    //         parent_header,
+    //         metadata: json!({}),
+    //         content: json!({}),
+    //     }
+    // }
 
     pub fn with_content(mut self, content: Value) -> Self {
         self.content = content;
@@ -90,10 +117,7 @@ impl std::fmt::Debug for JuMessage {
         write!(
             f,
             "], header: {}, parent_header: {}, metadata: {}, content: {} }}",
-            self.header,
-            self.parent_header,
-            self.metadata,
-            self.content
+            self.header, self.parent_header, self.metadata, self.content
         )
     }
 }
@@ -116,22 +140,31 @@ impl TryFrom<ZmqMessage> for JuMessage {
             .break_value()
             .ok_or(JuError::MalformedMessage("no delimiter found".into()))?;
 
-        let sig = it.next().ok_or(JuError::MalformedMessage("no signature".into()))?.to_vec();
+        let sig = it
+            .next()
+            .ok_or(JuError::MalformedMessage("no signature".into()))?
+            .to_vec();
+
+        // TODO: verify signature
 
         let header: Value = serde_json::from_slice(
-            it.next().ok_or(JuError::MalformedMessage("no header".into()))?
+            it.next()
+                .ok_or(JuError::MalformedMessage("no header".into()))?,
         )?;
 
         let parent_header: Value = serde_json::from_slice(
-            it.next().ok_or(JuError::MalformedMessage("no parent header".into()))?
+            it.next()
+                .ok_or(JuError::MalformedMessage("no parent header".into()))?,
         )?;
 
         let metadata: Value = serde_json::from_slice(
-            it.next().ok_or(JuError::MalformedMessage("no metadata".into()))?
+            it.next()
+                .ok_or(JuError::MalformedMessage("no metadata".into()))?,
         )?;
 
         let content: Value = serde_json::from_slice(
-            it.next().ok_or(JuError::MalformedMessage("no content".into()))?
+            it.next()
+                .ok_or(JuError::MalformedMessage("no content".into()))?,
         )?;
 
         Ok(JuMessage {
