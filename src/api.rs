@@ -3,7 +3,7 @@ use crate::message::EvalResult;
 
 pub trait JuKernel {
     fn kernel_info(&self) -> JuKernelInfo;
-    fn eval_code(&mut self, code: String) -> impl std::future::Future<Output = EvalResult> + Send;
+    fn eval_code(&mut self, code: String) -> impl std::future::Future<Output = EvalResult>;
 }
 
 pub struct JuKernelInfo {
