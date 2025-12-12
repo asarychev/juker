@@ -3,9 +3,13 @@ pub mod server;
 mod con_info;
 mod sockets;
 mod digester;
+mod api;
+mod shell_processor;
+mod server_id;
 
 pub use message::JuMessage;
 pub use con_info::ConnectionInfo;
+pub use api::{JuKernel, JuKernelInfo, JuHelpLink};
 
 #[derive(Debug, thiserror::Error)]
 pub enum JuError {
@@ -20,6 +24,9 @@ pub enum JuError {
 
     #[error(transparent)]
     TryLockError(#[from] tokio::sync::TryLockError),
+
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
 
     #[error("Unsupported Jupyter Message type: {0}")]
     UnsupportedMessageType(String),
@@ -39,7 +46,7 @@ pub enum JuError {
 
 pub type JuResult<T> = std::result::Result<T, JuError>;
 
-pub const DELIMITER: &[u8] = b"<IDS|MSG>";
+pub(crate) const DELIMITER: &[u8] = b"<IDS|MSG>";
 
 #[cfg(test)]
 mod tests {

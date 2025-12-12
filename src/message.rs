@@ -2,11 +2,13 @@ use std::ops::ControlFlow;
 
 use crate::{DELIMITER, JuError, JuResult, digester::Digester};
 use bytes::Bytes;
-use serde_json::{Value, json};
+use serde_json::Value;
 use zeromq::ZmqMessage;
 
 pub enum EvalResult {
-    Success { results: Vec<EvalValue> },
+    Success {
+        results: Vec<EvalValue>,
+    },
     Error {
         ename: Value,
         evalue: Value,
@@ -37,42 +39,6 @@ pub struct JuMessage {
 }
 
 impl JuMessage {
-    // pub fn create_derived(&self, msg_type: &str) -> Self {
-    //     let parent_header = self.header.clone();
-    //     let mut header = self.header.clone();
-    //     header["msg_type"] = Value::String(msg_type.into());
-
-    //     Self {
-    //         zmq_ids: Vec::new(),
-    //         header,
-    //         parent_header,
-    //         metadata: json!({}),
-    //         content: json!({}),
-    //     }
-    // }
-
-    // pub fn create_reply(&self) -> Self {
-    //     let parent_header = self.header.clone();
-    //     let mut header = self.header.clone();
-
-    //     header.get_mut("msg_type").into_iter().for_each(|v| {
-    //         if let Value::String(s) = v {
-    //             *s = s.replace("_request", "_reply");
-    //         }
-    //     });
-
-    //     let mut zmq_ids = Vec::new();
-    //     zmq_ids.clone_from(&self.zmq_ids);
-
-    //     Self {
-    //         zmq_ids,
-    //         header,
-    //         parent_header,
-    //         metadata: json!({}),
-    //         content: json!({}),
-    //     }
-    // }
-
     pub fn with_content(mut self, content: Value) -> Self {
         self.content = content;
         self
@@ -100,6 +66,7 @@ impl JuMessage {
         msg
     }
 }
+
 impl std::fmt::Debug for JuMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "JupyterMessage {{ zmq_ids: [")?;

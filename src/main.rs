@@ -1,6 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use juker::{ConnectionInfo, server::JuServer};
+use juker::{
+    ConnectionInfo, JuHelpLink, JuKernel, JuKernelInfo,
+    message::{EvalResult, EvalValue},
+    server::JuServer,
+};
+use serde_json::json;
 use std::{env, fs::File, path::PathBuf};
 use tracing::{debug, error, info, level_filters::LevelFilter, trace, warn};
 use tracing_subscriber::EnvFilter;
@@ -44,8 +49,8 @@ impl JupyterApplication {
         info!("Connection file content: {:?}", ci);
 
         loop {
-            let mut srv = JuServer::new(&ci).await?;
-            let res = srv.run().await;
+            let eva = Eva {};
+            let res = JuServer::start(&ci, eva).await;
 
             match &res {
                 Ok(true) => {
@@ -115,4 +120,41 @@ async fn main() -> Result<()> {
     };
 
     res
+}
+
+struct Eva;
+
+impl JuKernel for Eva {
+    fn kernel_info(&self) -> JuKernelInfo {
+        JuKernelInfo {
+            name: "testing".to_string(),
+            version: "0.0.0".to_string(),
+            mimetype: "text/testing".to_string(),
+            file_extension: ".testing".to_string(),
+            banner: "Juker Test Jupyter Kernel".to_string(),
+            help_links: vec![JuHelpLink {
+                text: "Juker Documentation".to_string(),
+                url: "https://github.com/asaryche/juker".to_string(),
+            }],
+        }
+    }
+
+    async fn eval_code(&mut self, code: String) -> EvalResult {
+        if code.starts_with("err") {
+            EvalResult::Error {
+                ename: json!("Error"),
+                evalue: json!("An error occurred during code execution"),
+                traceback: vec![json!("Traceback (most recent call last):"), json!("  ...")],
+            }
+        } else {
+            EvalResult::Success {
+                results: vec![EvalValue {
+                    data: json!({
+                        "text/plain": format!("Executed code: {}", code),
+                    }),
+                    metadata: json!({}),
+                }],
+            }
+        }
+    }
 }
