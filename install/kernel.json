@@ -1,6 +1,6 @@
 {
     "argv": [
-        "/Users/asaryche/projects/Rust/juker/target/debug/juker",
+        "/Users/alx/projects/juker/target/debug/juker",
         "--connection-file",
         "{connection_file}"
     ],
